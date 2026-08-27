@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   try {
     await connectToDB();
 
-    const thresholdDays = parseInt(process.env.TERRITORY_LOG_THRESHOLD_DAYS || "60", 10);
+    const thresholdDays = parseInt(process.env.TERRITORY_LOG_THRESHOLD_DAYS || "365", 10);
     const thresholdDate = subDays(new Date(), thresholdDays);
 
     // Buscar todos os territórios "done" de uma vez
@@ -46,7 +46,7 @@ export async function GET(req: Request) {
     if (territoriesToUpdate.length > 0) {
       await Territory.updateMany(
         { _id: { $in: territoriesToUpdate } },
-        { $set: { status: "urgent" } }
+        { $set: { status: "urgent" } },
       );
     }
 

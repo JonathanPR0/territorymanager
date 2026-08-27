@@ -7,7 +7,7 @@ import { useTerritories } from "@/hooks/useTerritories";
 import MapboxDraw from "@mapbox/mapbox-gl-draw";
 import "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css";
 import * as turf from "@turf/turf";
-import { ChevronLeft, CircleCheck, Layers } from "lucide-react";
+import { AlertTriangle, ChevronLeft, CircleCheck, Hash, Layers } from "lucide-react";
 import mapboxgl, { Map } from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useSearchParams } from "next/navigation";
@@ -25,6 +25,44 @@ export type SquareListProps = {
 // Defina a chave de acesso do Mapbox
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_APP_TOKEN;
 mapboxgl.accessToken = TOKEN;
+
+const DEFAULT_STATUS_EMOJI = "❔";
+const STATUS_CONFIG: Record<string, { color: string; label: string; emoji: string }> = {
+  done: { color: "#22c55e", label: "Concluído", emoji: "✅" },
+  assigned: { color: "#3b82f6", label: "Designado", emoji: "ℹ️" },
+  ongoing: { color: "#f59e0b", label: "Em andamento", emoji: "☑️" },
+  urgent: { color: "#ef4444", label: "Urgente", emoji: "⚠️" },
+};
+
+const DEFAULT_STATUS_COLOR = "#9ca3af";
+
+const statusColorExpression = [
+  "match",
+  ["get", "status"],
+  "done",
+  STATUS_CONFIG.done.color,
+  "assigned",
+  STATUS_CONFIG.assigned.color,
+  "ongoing",
+  STATUS_CONFIG.ongoing.color,
+  "urgent",
+  STATUS_CONFIG.urgent.color,
+  DEFAULT_STATUS_COLOR,
+] as unknown as mapboxgl.Expression;
+
+const statusEmojiExpression = [
+  "match",
+  ["get", "status"],
+  "done",
+  STATUS_CONFIG.done.emoji,
+  "assigned",
+  STATUS_CONFIG.assigned.emoji,
+  "ongoing",
+  STATUS_CONFIG.ongoing.emoji,
+  "urgent",
+  STATUS_CONFIG.urgent.emoji,
+  DEFAULT_STATUS_EMOJI,
+] as unknown as mapboxgl.Expression;
 
 function MapWithDraw({ canEdit }: { canEdit: boolean }) {
   const searchParams = useSearchParams();
@@ -54,6 +92,7 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
   const [styleLoaded, setStyleLoaded] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [squareList, setSquareList] = useState<SquareListProps[]>([]);
+  const [labelMode, setLabelMode] = useState<"number" | "status">("number");
 
   //& EFFECT DE CLIENTE
   useEffect(() => {
@@ -115,6 +154,7 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
 
   //& ATUALIZAÇÃO DE ESTILO
   const mapContainer = useRef<HTMLDivElement | null>(null);
+  const statusMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const map = useRef<Map | null>(null);
   const draw = useRef<MapboxDraw | null>(null);
   useEffect(() => {
@@ -137,7 +177,7 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
       const id = e.features[0].properties?.id;
       openSideInfo({ id, mode: "territory" });
     },
-    [openSideInfo]
+    [openSideInfo],
   );
   const lastTapRef = useRef(0);
 
@@ -161,7 +201,7 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
 
       lastTapRef.current = currentTime;
     },
-    [handleTerritoryClick]
+    [handleTerritoryClick],
   );
 
   // Função para limpar os event listeners de território
@@ -198,7 +238,7 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
         openSideInfo({ id, mode: "square" });
       }
     },
-    [number]
+    [number],
   );
 
   const handleRemoveSquare = useCallback(
@@ -207,7 +247,7 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
       const id = e.features[0].properties?.id;
       openAlertRemoveSquare(id);
     },
-    [openAlertRemoveSquare]
+    [openAlertRemoveSquare],
   );
 
   //* --------------- QUADRAS ---------------
@@ -384,7 +424,7 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
       isSuccess,
       isPending,
       mode,
-    ]
+    ],
   );
 
   //& FUNÇÃO DE CARREGAR QUADRAS
@@ -403,151 +443,6 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
         number: territory.number,
         doneSquaresList: territory.doneSquaresList || [],
       });
-      // // Criar fontes para cada território
-      // const squaresSourceId = `squares-${territory._id}`;
-      // const squaresLabelsSourceId = `squares-labels-${territory._id}`;
-      // const squaresFillId = `squares-fill-${territory._id}`;
-      // const squaresOutlineId = `squares-outline-${territory._id}`;
-      // const squaresNumberId = `squares-number-${territory._id}`;
-
-      // // Removendo layers e sources existentes
-      // const layersToRemove = [squaresFillId, squaresOutlineId, squaresNumberId];
-      // layersToRemove.forEach((layer) => {
-      //   if (map.current!.getLayer(layer)) {
-      //     map.current!.removeLayer(layer);
-      //   }
-      // });
-
-      // const sourcesToRemove = [squaresSourceId, squaresLabelsSourceId];
-      // sourcesToRemove.forEach((source) => {
-      //   if (map.current!.getSource(source)) {
-      //     map.current!.removeSource(source);
-      //   }
-      // });
-
-      // // Adicionar o source de squares para o território
-      // map.current.addSource(squaresSourceId, {
-      //   type: "geojson",
-      //   data: {
-      //     type: "FeatureCollection",
-      //     features: squares.map((square) => ({
-      //       type: "Feature",
-      //       properties: {
-      //         id: square._id,
-      //         color: territory?.group?.color,
-      //         number: `${territory?.number}${square.letter}`,
-      //       },
-      //       geometry: {
-      //         type: "Polygon",
-      //         coordinates: square.coordinates || [],
-      //       },
-      //     })),
-      //   },
-      // });
-
-      // // Adicionar o source de labels para os squares do território
-      // map.current.addSource(squaresLabelsSourceId, {
-      //   type: "geojson",
-      //   data: {
-      //     type: "FeatureCollection",
-      //     features: squares.map((square) => {
-      //       const center = turf.centroid({
-      //         type: "Feature",
-      //         properties: {},
-      //         geometry: { type: "Polygon", coordinates: square?.coordinates || [] },
-      //       }).geometry.coordinates;
-
-      //       return {
-      //         type: "Feature",
-      //         properties: {
-      //           number: `${territory?.number}${square.letter}` || "",
-      //           color: territory?.group?.color || "",
-      //         },
-      //         geometry: { type: "Point", coordinates: center },
-      //       };
-      //     }),
-      //   },
-      // });
-
-      // // Adicionar a camada de preenchimento das quadras para o território
-      // map.current.addLayer({
-      //   id: squaresFillId,
-      //   type: "fill",
-      //   source: squaresSourceId,
-      //   paint: {
-      //     "fill-color": ["get", "color"],
-      //     "fill-opacity": [
-      //       "step",
-      //       ["to-number", ["in", ["get", "id"], ["literal", squareList.map((sq) => sq.id)]]],
-      //       0.2,
-      //       1,
-      //       0.8,
-      //     ],
-      //   },
-      // });
-
-      // if (number) {
-      //   const doneSquaresList = territory?.doneSquaresList;
-      //   if (doneSquaresList && map.current!.getLayer(squaresFillId)) {
-      //     map.current.setPaintProperty(squaresFillId, "fill-opacity", [
-      //       "step",
-      //       ["to-number", ["in", ["get", "id"], ["literal", doneSquaresList]]],
-      //       0.2,
-      //       1,
-      //       0.8,
-      //     ]);
-      //   }
-      // }
-
-      // // Adicionar a camada das bordas dos squares para o território
-      // map.current.addLayer({
-      //   id: squaresOutlineId,
-      //   type: "line",
-      //   source: squaresSourceId,
-      //   paint: {
-      //     "line-color": ["get", "color"],
-      //     "line-width": 2,
-      //   },
-      // });
-
-      // // Adicionar a camada de números dos squares
-      // map.current.addLayer({
-      //   id: squaresNumberId,
-      //   type: "symbol",
-      //   source: squaresLabelsSourceId,
-      //   layout: {
-      //     "text-field": ["get", "number"],
-      //     "text-size": 18,
-      //     "text-font": ["Open Sans Bold"],
-      //     "text-anchor": "center",
-      //   },
-      //   paint: {
-      //     "text-color": ["get", "color"],
-      //     "text-halo-color": "#fefefe",
-      //     "text-halo-width": 1,
-      //   },
-      // });
-
-      // map.current.off("click", squaresFillId, handleSquareClick);
-      // map.current.off("touchend", squaresFillId, handleSquareClick);
-      // map.current.off("dblclick", squaresFillId, handleRemoveSquare);
-      // // Mudar cursor ao passar sobre os polígonos
-      // map.current.on("mouseenter", squaresFillId, () => {
-      //   map.current!.getCanvas().style.cursor = "pointer";
-      // });
-
-      // map.current.on("mouseleave", squaresFillId, () => {
-      //   map.current!.getCanvas().style.cursor = "";
-      // });
-
-      // // Eventos nas quadras
-      // if (number) {
-      //   map.current.on("click", squaresFillId, handleSquareClick);
-      //   map.current.on("touchend", squaresFillId, handleSquareClick);
-      // } else if (canEdit) {
-      //   // Eventos de remoção das quadras
-      //   map.current.on("dblclick", squaresFillId, handleRemoveSquare);
-      // }
     });
 
     orphansSquares?.length &&
@@ -604,6 +499,54 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
   }, [territories, number, styleLoaded]);
 
   //* -----------------------------------------
+
+  //* -------------- STATUS MARKERS ---------------
+
+  //& MARCADORES
+  const clearStatusMarkers = useCallback(() => {
+    statusMarkersRef.current.forEach((marker) => marker.remove());
+    statusMarkersRef.current = [];
+  }, []);
+  const renderStatusMarkers = useCallback(() => {
+    clearStatusMarkers();
+
+    if (!map.current || !territories?.length) return;
+
+    // Só mostra o status quando estamos vendo só o território (sem quadras)
+    const onlyTerritoryView = !showSquares || (canEdit && mode === "territory");
+    if (!onlyTerritoryView || labelMode !== "status") return;
+
+    territories.forEach((territorio) => {
+      if (!territorio?.coordinates) return;
+
+      const center = turf.centroid({
+        type: "Feature",
+        properties: {},
+        geometry: { type: "Polygon", coordinates: territorio.coordinates },
+      }).geometry.coordinates as [number, number];
+
+      const emoji = STATUS_CONFIG[territorio?.status ?? ""]?.emoji ?? DEFAULT_STATUS_EMOJI;
+
+      const el = document.createElement("div");
+      el.style.fontSize = "18px";
+      el.style.lineHeight = "1";
+      el.style.transform = "translate(28px, 0px)"; // só desloca para o lado, mesma altura do número
+      el.style.pointerEvents = "none";
+      el.textContent = emoji;
+
+      const marker = new mapboxgl.Marker({ element: el, anchor: "center" })
+        .setLngLat(center)
+        .addTo(map.current!);
+
+      statusMarkersRef.current.push(marker);
+    });
+  }, [territories, showSquares, canEdit, mode, labelMode, clearStatusMarkers]);
+  useEffect(() => {
+    if (styleLoaded && isClient) {
+      renderStatusMarkers();
+    }
+  }, [mode, showSquares, labelMode, styleLoaded, isClient, renderStatusMarkers]);
+  //* -------------------------------------------
 
   //* --------------- TERRITÓRIOS ---------------
   //& FUNÇÃO DE CARREGAR TERRITÓRIOS
@@ -704,8 +647,10 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
         },
       });
 
+      const onlyTerritoryView = !showSquares || (canEdit && mode === "territory");
+
       // Criar um novo source para os números (centro dos territórios)
-      if (!showSquares || (canEdit && mode === "territory")) {
+      if (onlyTerritoryView) {
         map.current.addSource("territories-labels", {
           type: "geojson",
           data: {
@@ -734,23 +679,25 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
             }),
           },
         });
-        // Adicionar camada para os números no centro dos territórios
-        map.current.addLayer({
-          id: "territories-number",
-          type: "symbol",
-          source: "territories-labels",
-          layout: {
-            "text-field": ["get", "number"], // Exibe o número do number
-            "text-size": 18,
-            "text-font": ["Open Sans Bold"], // Usa a versão bold da fonte
-            "text-anchor": "center",
-          },
-          paint: {
-            "text-color": ["get", "color"], // Cor do número
-            "text-halo-color": "#fefefe", // Borda branca para melhorar a visibilidade
-            "text-halo-width": 1,
-          },
-        });
+        if (labelMode === "number") {
+          // Adicionar camada para os números no centro dos territórios
+          map.current.addLayer({
+            id: "territories-number",
+            type: "symbol",
+            source: "territories-labels",
+            layout: {
+              "text-field": ["get", "number"], // Exibe o número do number
+              "text-size": 18,
+              "text-font": ["Open Sans Bold"], // Usa a versão bold da fonte
+              "text-anchor": "center",
+            },
+            paint: {
+              "text-color": ["get", "color"], // Cor do número
+              "text-halo-color": "#fefefe", // Borda branca para melhorar a visibilidade
+              "text-halo-width": 1,
+            },
+          });
+        }
         // Mudar cursor ao passar sobre os polígonos
         // Primeiro removemos todos os listeners existentes
         map.current.off("dblclick", "territories-fill", handleTerritoryClick);
@@ -812,6 +759,8 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
           maxZoom: number ? 18 : 16,
           duration: 1000,
         });
+
+        renderStatusMarkers(); // Renderiza os marcadores de status após ajustar os limites do mapa
       }
     }, 350);
   }
@@ -822,9 +771,9 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
       loadTerritories();
     }
 
-    // Limpar event listeners quando o componente é desmontado ou o modo muda
     return () => {
       cleanupTerritoryListeners();
+      clearStatusMarkers();
     };
   }, [
     territories,
@@ -835,7 +784,9 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
     isSuccess,
     isPending,
     mode,
+    labelMode,
     cleanupTerritoryListeners,
+    clearStatusMarkers,
   ]);
 
   //* -------------------------------------------
@@ -904,6 +855,18 @@ function MapWithDraw({ canEdit }: { canEdit: boolean }) {
           </>
         )}
         {canEdit && <ToggleMapMode mode={mode} toggleMode={toggleMode} />}
+        {(!showSquares || (canEdit && mode === "territory")) && (
+          <Button
+            onClick={() => setLabelMode((prev) => (prev === "number" ? "status" : "number"))}
+            size={"sm"}
+            variant={"secondary"}
+            className="aspect-square rounded-full w-10 h-10"
+            style={{ position: "absolute", top: "10px", left: "60px", zIndex: 1 }}
+            title={labelMode === "number" ? "Mostrar status" : "Mostrar número"}
+          >
+            {labelMode === "number" ? <AlertTriangle size={18} /> : <Hash size={18} />}
+          </Button>
+        )}
       </div>
       <TerritorySideInfo removeFeature={deleteSelectedPolygon} editing={canEdit} />
       <SquareSideInfo removeFeature={deleteSelectedPolygon} editing={canEdit} />

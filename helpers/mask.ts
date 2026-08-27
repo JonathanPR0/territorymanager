@@ -8,11 +8,16 @@ export const normalizeNumberOnly = (value: string | undefined) => {
 export const normalizePhoneNumber = (value: string | undefined) => {
   if (!value) return "";
 
-  return value
-    .replace(/[\D]/g, "")
+  const digits = value.replace(/\D/g, "");
+  const hasCountryCode = digits.startsWith("55") && digits.length > 11;
+  const phone = hasCountryCode ? digits.slice(2) : digits;
+
+  const formattedPhone = phone
     .replace(/(\d{2})(\d)/, "($1) $2")
     .replace(/(\d{5})(\d)/, "$1-$2")
     .replace(/(-\d{4})(\d+?)/, "$1");
+
+  return hasCountryCode ? `+55 ${formattedPhone}` : formattedPhone;
 };
 
 export const normalizeCnpjNumber = (value: string | undefined) => {
@@ -43,7 +48,10 @@ export const normalizeCepNumber = (value: string | undefined) => {
 };
 
 export const normalizePercentual = (value: string | undefined, casasDecimais = 2) => {
-  return parseFloat(value || "0").toLocaleString("pt-BR", { style: "percent", minimumFractionDigits: casasDecimais });
+  return parseFloat(value || "0").toLocaleString("pt-BR", {
+    style: "percent",
+    minimumFractionDigits: casasDecimais,
+  });
 };
 
 export const normalizeDataDayOne = (dataString?: string) => {

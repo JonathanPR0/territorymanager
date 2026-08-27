@@ -57,8 +57,11 @@ export async function PUT(req: NextRequest) {
     }
 
     const updateFields: any = { status };
-    // Verifique se o status atual é "done" e o novo status é "assigned" para resetar o doneSquaresList
-    if (currentTerritory.status === "done" && status === "assigned") {
+    // Verifique se o status atual é "done" ou "urgent" e o novo status é "assigned" para resetar o doneSquaresList
+    if (
+      (currentTerritory.status === "done" || currentTerritory.status === "urgent") &&
+      status === "assigned"
+    ) {
       updateFields.doneSquaresList = [];
     }
 
@@ -68,7 +71,7 @@ export async function PUT(req: NextRequest) {
     }
 
     // Se for "done", esvazia o array de responsáveis
-    if (status === "done") {
+    if (status === "done" || status === "urgent") {
       updateFields.responsibles = [];
     }
 

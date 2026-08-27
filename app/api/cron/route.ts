@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   try {
     await connectToDB();
 
-    const thresholdDays = parseInt(process.env.TERRITORY_LOG_THRESHOLD_DAYS || "365", 10);
+    const thresholdDays = parseInt(String(process.env.TERRITORY_LOG_THRESHOLD_DAYS) || "365", 10);
     const thresholdDate = subDays(new Date(), thresholdDays);
 
     // Buscar todos os territórios "done" de uma vez
